@@ -1,0 +1,412 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>kettle</title>
+<style>
+  :root {
+    --bg: #f6f5f2;
+    --surface: #ffffff;
+    --text: #1d1d1b;
+    --muted: #6b6a66;
+    --border: #e2e0da;
+    --accent: #c2581c;
+    --accent-text: #ffffff;
+    --ok: #2f7d4f;
+    --warn: #a86a00;
+    --danger: #b3261e;
+    --chip: #efede8;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #161614;
+      --surface: #201f1d;
+      --text: #ecebe7;
+      --muted: #9b9a95;
+      --border: #34332f;
+      --accent: #e0793b;
+      --accent-text: #1a1206;
+      --ok: #6cc58f;
+      --warn: #e2a948;
+      --danger: #f2817a;
+      --chip: #2b2a27;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 15px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Noto Sans CJK SC", sans-serif;
+  }
+  main { max-width: 760px; margin: 0 auto; padding: 24px 16px 64px; }
+  header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 20px; }
+  #schedule { margin-top: 2px; }
+  h1 { font-size: 22px; margin: 0; letter-spacing: 0.5px; }
+  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin: 28px 0 10px; }
+  a { color: var(--accent); word-break: break-all; }
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 16px;
+    margin-bottom: 10px;
+  }
+  textarea, input {
+    width: 100%;
+    font: inherit;
+    color: var(--text);
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+  }
+  textarea { resize: vertical; min-height: 84px; }
+  textarea:focus, input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  button {
+    font: inherit;
+    font-size: 14px;
+    border-radius: 7px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    padding: 6px 12px;
+    cursor: pointer;
+  }
+  button:hover:not(:disabled) { border-color: var(--muted); }
+  button:disabled { opacity: 0.5; cursor: default; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-text); font-weight: 600; }
+  button.danger { color: var(--danger); }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .row.end { justify-content: flex-end; margin-top: 10px; }
+  .muted { color: var(--muted); font-size: 13px; }
+  .chip {
+    display: inline-block;
+    font-size: 12px;
+    padding: 1px 8px;
+    border-radius: 999px;
+    background: var(--chip);
+    color: var(--muted);
+    white-space: nowrap;
+  }
+  .chip.watching { color: var(--accent); }
+  .chip.resolved { color: var(--ok); }
+  .chip.error, .chip.failed { color: var(--danger); }
+  .chip.running, .chip.queued { color: var(--warn); }
+  .q-title { font-weight: 600; margin: 6px 0; }
+  .summary { margin: 6px 0; }
+  .sources { margin: 4px 0 0; padding-left: 18px; font-size: 13px; }
+  details { margin-top: 8px; }
+  summary { cursor: pointer; color: var(--muted); font-size: 13px; }
+  .pre { white-space: pre-wrap; font-size: 13px; margin: 6px 0 0; }
+  .hist { border-top: 1px solid var(--border); padding: 8px 0; font-size: 13px; }
+  .hist:first-child { border-top: none; }
+  .err { color: var(--danger); font-size: 13px; }
+  .empty { text-align: center; color: var(--muted); padding: 24px 0; }
+  .hidden { display: none; }
+  .edit-label { font-size: 13px; color: var(--muted); margin: 8px 0 4px; display: block; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <div>
+      <h1>🫖 kettle</h1>
+      <div id="schedule" class="muted"></div>
+    </div>
+    <button id="logout" class="hidden" title="清除本机保存的 token">退出</button>
+  </header>
+
+  <section id="auth" class="card hidden">
+    <div class="q-title">需要 token</div>
+    <p class="muted">填入 config.toml 里 [server] 的 token,会保存在这台设备的浏览器里。</p>
+    <div class="row">
+      <input id="token" type="password" placeholder="token" autocomplete="current-password" style="flex:1">
+      <button id="save-token" class="primary">保存</button>
+    </div>
+  </section>
+
+  <div id="app">
+    <section class="card">
+      <label for="intent" class="q-title" style="display:block">想监控什么?</label>
+      <textarea id="intent" placeholder="用大白话描述,比如:Kindle Scribe Colorsoft 5.19.6 什么时候能重新越狱"></textarea>
+      <div class="row end">
+        <span id="analyze-err" class="err"></span>
+        <button id="analyze" class="primary">分析并开始监控</button>
+      </div>
+      <p class="muted" style="margin:8px 0 0">AI 会先搜索现状、找权威来源，写好判定标准后自动加入监控。需要几分钟，完成后会推送通知。</p>
+    </section>
+
+    <div id="jobs-wrap" class="hidden">
+      <h2>任务</h2>
+      <div id="jobs"></div>
+    </div>
+
+    <h2>监控中的问题</h2>
+    <div id="questions"><div class="empty">加载中…</div></div>
+  </div>
+</main>
+
+<script>
+const TOKEN_KEY = "kettle-token";
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+function getToken() {
+  try { return localStorage.getItem(TOKEN_KEY) || ""; } catch { return ""; }
+}
+function setToken(t) {
+  try { t ? localStorage.setItem(TOKEN_KEY, t) : localStorage.removeItem(TOKEN_KEY); } catch {}
+}
+
+class AuthError extends Error {}
+
+async function api(method, path, body) {
+  const headers = { "Content-Type": "application/json" };
+  const token = getToken();
+  if (token) headers.Authorization = `Bearer ${token}`;
+  const res = await fetch(path, { method, headers, body: body ? JSON.stringify(body) : undefined });
+  const data = await res.json().catch(() => ({}));
+  if (res.status === 401) throw new AuthError(data.error || "unauthorized");
+  if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+  return data;
+}
+
+function showAuth(show) {
+  $("auth").classList.toggle("hidden", !show);
+  $("app").classList.toggle("hidden", show);
+  $("logout").classList.toggle("hidden", show || !getToken());
+}
+
+function fmtTime(iso) {
+  if (!iso) return "从未";
+  const d = new Date(iso);
+  return d.toLocaleString("zh-CN", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" });
+}
+
+const STATUS_LABEL = { watching: "监控中", resolved: "已发生", queued: "排队中", running: "进行中", done: "完成", failed: "失败" };
+const CONF_LABEL = { high: "高", medium: "中", low: "低" };
+
+function sourcesHtml(sources) {
+  if (!sources || !sources.length) return "";
+  return `<ul class="sources">${sources.map((u) => `<li><a href="${esc(u)}" target="_blank" rel="noopener">${esc(u)}</a></li>`).join("")}</ul>`;
+}
+
+// --- jobs ---
+
+let jobs = [];
+let pollTimer = null;
+
+function jobHtml(j) {
+  const title = j.kind === "analyze" ? `分析:${esc(j.meta.intent)}` : `探测:${esc(j.meta.id)}`;
+  let detail = "";
+  if (j.status === "failed") {
+    detail = `<div class="err">${esc(j.error)}</div>`;
+  } else if (j.status === "done" && j.kind === "analyze") {
+    const r = j.result;
+    detail = r.added
+      ? `<div class="summary">已加入监控 <b>${esc(r.question.id)}</b>:${esc(r.question.question)}</div>`
+      : `<div class="summary">已经发生了，未加入监控。${esc(r.analysis.summary)}</div>${sourcesHtml(r.analysis.sources)}`;
+  } else if (j.status === "done" && j.kind === "probe") {
+    detail = j.result.skipped
+      ? `<div class="muted">已跳过:${esc(j.result.skipped)}</div>`
+      : `<div class="summary">${esc(j.result.result.summary)}</div>`;
+  }
+  return `<div class="card">
+    <div class="row"><span class="chip ${j.status}">${STATUS_LABEL[j.status]}</span><span class="muted">${fmtTime(j.created_at)}</span></div>
+    <div class="q-title">${title}</div>${detail}</div>`;
+}
+
+function renderJobs() {
+  $("jobs-wrap").classList.toggle("hidden", !jobs.length);
+  $("jobs").innerHTML = jobs.slice(0, 5).map(jobHtml).join("");
+}
+
+let scheduleBusy = false;
+
+function renderSchedule(s) {
+  scheduleBusy = Boolean(s.current);
+  const parts = [];
+  if (s.error) parts.push(`<span class="err">定时出错:${esc(s.error)}</span>`);
+  else if (!s.times.length) parts.push("未设置定时探测");
+  else parts.push(`每天 ${s.times.join(" / ")} 探测${s.next_run ? ` · 下次 ${fmtTime(s.next_run)}` : ""}`);
+  if (s.current) parts.push(`正在探测 ${esc(s.current)}`);
+  $("schedule").innerHTML = parts.join(" · ");
+}
+
+function hasActiveJobs() {
+  return scheduleBusy || jobs.some((j) => j.status === "queued" || j.status === "running");
+}
+
+async function refresh() {
+  try {
+    const [q, j, s] = await Promise.all([api("GET", "/api/questions"), api("GET", "/api/jobs"), api("GET", "/api/schedule")]);
+    showAuth(false);
+    renderSchedule(s.schedule);
+    jobs = j.jobs;
+    renderJobs();
+    renderQuestions(q.questions);
+  } catch (e) {
+    if (e instanceof AuthError) return showAuth(true);
+    $("questions").innerHTML = `<div class="empty err">${esc(e.message)}</div>`;
+  }
+  schedulePoll();
+}
+
+function schedulePoll() {
+  clearTimeout(pollTimer);
+  pollTimer = setTimeout(refresh, hasActiveJobs() ? 3000 : 30000);
+}
+
+// --- questions ---
+
+const openState = new Map(); // question id -> {criteria, history} open flags, kept across re-renders
+let editing = null;
+
+function questionHtml(q) {
+  const status = q.last_error ? "error" : q.status;
+  const statusLabel = q.last_error ? `出错 ×${q.consecutive_errors}` : STATUS_LABEL[q.status];
+  const r = q.last_result;
+  const probing = q.probing || jobs.some((j) => j.kind === "probe" && j.meta.id === q.id && (j.status === "queued" || j.status === "running"));
+  const open = openState.get(q.id) || {};
+
+  if (editing === q.id) {
+    return `<div class="card" data-id="${esc(q.id)}">
+      <span class="edit-label">问题</span><textarea data-field="question" style="min-height:60px">${esc(q.question)}</textarea>
+      <span class="edit-label">判定标准</span><textarea data-field="criteria" style="min-height:200px">${esc(q.criteria)}</textarea>
+      <div class="row end"><span class="err" data-role="err"></span>
+        <button data-act="cancel">取消</button><button class="primary" data-act="save">保存</button></div>
+    </div>`;
+  }
+
+  return `<div class="card" data-id="${esc(q.id)}">
+    <div class="row">
+      <span class="chip ${status}">${statusLabel}</span>
+      <span class="muted">${esc(q.id)} · 上次探测 ${fmtTime(q.last_probe)}${r ? ` · 置信度 ${CONF_LABEL[r.confidence] || esc(r.confidence)}` : ""}</span>
+    </div>
+    <div class="q-title">${esc(q.question)}</div>
+    ${r ? `<div class="summary">${esc(r.summary)}</div>${sourcesHtml(r.sources)}` : ""}
+    ${q.last_error ? `<div class="err">${esc(q.last_error)}</div>` : ""}
+    <details data-sec="criteria" ${open.criteria ? "open" : ""}><summary>判定标准</summary><div class="pre">${esc(q.criteria)}</div>
+      ${q.intent ? `<div class="muted" style="margin-top:6px">原始描述:${esc(q.intent)}</div>` : ""}</details>
+    <details data-sec="history" ${open.history ? "open" : ""}><summary>探测历史</summary><div data-role="history" class="muted">加载中…</div></details>
+    <div class="row end">
+      <span class="err" data-role="err"></span>
+      ${q.status === "resolved" ? `<button data-act="reset">重新监控</button>` : ""}
+      <button data-act="probe" ${probing ? "disabled" : ""}>${probing ? "探测中…" : "立即探测"}</button>
+      <button data-act="edit">编辑</button>
+      <button data-act="delete" class="danger">删除</button>
+    </div>
+  </div>`;
+}
+
+let lastQuestions = [];
+
+function renderQuestions(questions) {
+  lastQuestions = questions;
+  if (editing && document.querySelector(`[data-id="${CSS.escape(editing)}"] textarea`)) return; // don't clobber an open editor
+  $("questions").innerHTML = questions.length
+    ? questions.map(questionHtml).join("")
+    : `<div class="empty">还没有问题，在上面描述一个想监控的事吧</div>`;
+  document.querySelectorAll('details[data-sec="history"][open]').forEach(loadHistory);
+}
+
+async function loadHistory(details) {
+  const id = details.closest("[data-id]").dataset.id;
+  const box = details.querySelector('[data-role="history"]');
+  try {
+    const { history } = await api("GET", `/api/questions/${encodeURIComponent(id)}/history?limit=20`);
+    box.classList.remove("muted");
+    box.innerHTML = history.length
+      ? history.map((h) => `<div class="hist"><span class="muted">${fmtTime(h.time)}${h.via === "analyze" ? " · 初始分析" : ""}</span><br>${
+          h.error ? `<span class="err">${esc(h.error)}</span>`
+                  : `${h.result.resolved ? "✅ " : ""}${esc(h.result.summary)}`}</div>`).join("")
+      : "暂无记录";
+  } catch (e) {
+    box.innerHTML = `<span class="err">${esc(e.message)}</span>`;
+  }
+}
+
+$("questions").addEventListener("toggle", (ev) => {
+  const d = ev.target;
+  if (d.tagName !== "DETAILS") return;
+  const id = d.closest("[data-id]").dataset.id;
+  openState.set(id, { ...(openState.get(id) || {}), [d.dataset.sec]: d.open });
+  if (d.dataset.sec === "history" && d.open) loadHistory(d);
+}, true);
+
+$("questions").addEventListener("click", async (ev) => {
+  const btn = ev.target.closest("button[data-act]");
+  if (!btn) return;
+  const card = btn.closest("[data-id]");
+  const id = card.dataset.id;
+  const path = `/api/questions/${encodeURIComponent(id)}`;
+  const errBox = card.querySelector('[data-role="err"]');
+  errBox.textContent = "";
+  try {
+    switch (btn.dataset.act) {
+      case "probe": btn.disabled = true; await api("POST", `${path}/probe`); break;
+      case "reset": await api("POST", `${path}/reset`); break;
+      case "edit": editing = id; break;
+      case "cancel": editing = null; break;
+      case "save": {
+        const fields = {};
+        card.querySelectorAll("textarea[data-field]").forEach((t) => { fields[t.dataset.field] = t.value; });
+        await api("PATCH", path, fields);
+        editing = null;
+        break;
+      }
+      case "delete":
+        if (btn.dataset.confirm !== "1") {
+          btn.dataset.confirm = "1";
+          btn.textContent = "确认删除?";
+          setTimeout(() => { btn.dataset.confirm = ""; btn.textContent = "删除"; }, 4000);
+          return;
+        }
+        await api("DELETE", path);
+        break;
+    }
+  } catch (e) {
+    if (e instanceof AuthError) return showAuth(true);
+    errBox.textContent = e.message;
+    btn.disabled = false;
+    return;
+  }
+  if (btn.dataset.act === "edit" || btn.dataset.act === "cancel") return renderQuestions(lastQuestions);
+  refresh();
+});
+
+// --- analyze ---
+
+$("analyze").addEventListener("click", async () => {
+  const intent = $("intent").value.trim();
+  $("analyze-err").textContent = "";
+  if (!intent) { $("analyze-err").textContent = "先描述一下想监控什么"; return; }
+  $("analyze").disabled = true;
+  try {
+    await api("POST", "/api/analyze", { intent });
+    $("intent").value = "";
+  } catch (e) {
+    if (e instanceof AuthError) return showAuth(true);
+    $("analyze-err").textContent = e.message;
+  } finally {
+    $("analyze").disabled = false;
+  }
+  refresh();
+});
+
+// --- auth ---
+
+$("save-token").addEventListener("click", () => {
+  setToken($("token").value.trim());
+  $("token").value = "";
+  refresh();
+});
+$("token").addEventListener("keydown", (e) => { if (e.key === "Enter") $("save-token").click(); });
+$("logout").addEventListener("click", () => { setToken(""); showAuth(true); });
+
+refresh();
+</script>
+</body>
+</html>

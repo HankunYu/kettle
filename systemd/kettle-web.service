@@ -1,0 +1,14 @@
+[Unit]
+Description=kettle - HTTP API and web UI
+After=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=@KETTLE_DIR@
+Environment=PYTHONUNBUFFERED=1
+ExecStart=@PYTHON@ -m kettle serve
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target

@@ -1,0 +1,11 @@
+# One [[questions]] block per tracked question.
+# id: unique slug; question: what you want to know; criteria: what counts as "resolved".
+# questions.toml is created/rewritten by kettle (analyze / add / web UI); you rarely
+# need to write it by hand. This file shows the format: a good criteria names the
+# authoritative sources to check, the known background that must NOT count, and
+# exactly which conditions mean "it happened".
+
+[[questions]]
+id = "python-3-15-final"
+question = "Python 3.15.0 正式版发布了没有?"
+criteria = "python.org 发布 3.15.0 final(不是 alpha / beta / rc)。必须直接核对的来源:(1) https://www.python.org/downloads/ 列出 Python 3.15.0;(2) https://github.com/python/cpython/tags 出现 v3.15.0 tag。满足 (1) 或 (2) 即算有结果。预发布版本、PEP 里的计划日期、第三方新闻都不算。"

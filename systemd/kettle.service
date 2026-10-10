@@ -1,0 +1,9 @@
+[Unit]
+Description=kettle - probe questions that are due
+After=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=@KETTLE_DIR@
+Environment=PYTHONUNBUFFERED=1
+ExecStart=@PYTHON@ -m kettle run

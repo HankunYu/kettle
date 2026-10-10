@@ -1,0 +1,11 @@
+[Unit]
+Description=kettle probe timer (probe times come from [schedule] in config.toml)
+
+[Timer]
+# `kettle run` only probes questions that are due, so firing often is cheap
+# and makes the configured times take effect within 15 minutes.
+OnCalendar=*:0/15
+Persistent=true
+
+[Install]
+WantedBy=timers.target

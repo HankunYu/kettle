@@ -1,0 +1,51 @@
+# Copy to config.toml and fill in. config.toml is gitignored.
+# API keys go in .env (gitignored), never here:
+#   ANTHROPIC_API_KEY=...   anthropic engine; also used by claude-code if set
+#   OPENAI_API_KEY=...      openai engine
+#   GEMINI_API_KEY=...      gemini engine
+
+# Bark push (key from the Bark iOS app)
+bark_key = "YOUR_BARK_KEY"
+bark_server = "https://api.day.app"
+
+[schedule]
+# Local times to probe every watching question, as many per day as you like.
+# Missed slots (machine off / asleep) are caught up on the next run.
+times = ["09:30"]
+
+[probe]
+# Engine for daily probes: claude-code | anthropic | openai | gemini
+engine = "claude-code"
+model = "sonnet"     # model name for the chosen engine (see [engines.*] below for examples)
+max_turns = 25       # claude-code: turn limit; anthropic: max searches / fetches per run
+timeout = 900        # seconds per run
+
+[analyze]
+# Monitor setup research (`kettle analyze` / POST /api/analyze).
+# Any key left out is taken from [probe].
+# engine = "anthropic"
+# model = "claude-opus-5-5"
+max_turns = 40
+
+[engines.claude-code]
+# Headless Claude Code CLI. Uses the subscription login unless ANTHROPIC_API_KEY is in .env.
+bin = "claude"  # absolute path if systemd cannot find it on PATH (see `command -v claude`)
+
+[engines.anthropic]
+# Messages API + web search / web fetch. Example model: "claude-sonnet-5-5"
+# base_url = "https://api.anthropic.com"
+
+[engines.openai]
+# Responses API + web_search. Example model: "gpt-5.5"
+reasoning_effort = "medium"  # low | medium | high; remove for non-reasoning models
+# base_url = "https://api.openai.com"
+
+[engines.gemini]
+# generateContent + Google Search grounding + URL context. Example model: "gemini-3.8-flash"
+# base_url = "https://generativelanguage.googleapis.com"
+
+[server]
+host = "127.0.0.1"   # use "0.0.0.0" to expose; a token is then required
+port = 8730
+token = ""           # Bearer token for /api/*; generate with: openssl rand -hex 24
+workers = 1          # concurrent background jobs (analyses, manual probes)
